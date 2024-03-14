@@ -251,7 +251,7 @@ def parse_options():
                             help='caption text to describe the original human.')
     instruct_humans_group.add_argument('--caption_tgt', type=str, default="A photo of a clown",
                             help='caption text to describe the target human.')
-    instruct_humans_group.add_argument('--traced_points_data_root', type=str, default='prepared_tracing.h5',
+    instruct_humans_group.add_argument('--traced_points_data_root', type=str, default='prepared_dataset.h5',
                             help='the prepared traced points data file.')
     instruct_humans_group.add_argument('--use_traced_point_dataset', type=bool, default=False, 
                             help='use the prepared traced points to speed up.')

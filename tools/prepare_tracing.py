@@ -147,11 +147,13 @@ class TracingPrepare(nn.Module):
         # * create dataset file
         outfile = h5py.File(os.path.join(self.cfg.output_path), 'w')
         subject_list  = eval(self.cfg.subject_list) # [32, 34,]
-        print(subject_list)
+
         subject_list = [int(i) for i in subject_list]
-        print(subject_list)
         num_subjects = len(subject_list)
         outfile.create_dataset( 'num_subjects', data=num_subjects, dtype=np.int32)
+
+        subject_list_arr = np.array(subject_list, dtype=np.int32)
+        outfile.create_dataset('subject_list', data=subject_list_arr) 
         # for rendering
         dataset_fix_render_xs = outfile.create_dataset( 'fix_render_xs', shape=(num_subjects, self.cfg.n_views + fix_n_views_face, self.cfg.width*self.cfg.width, 3),
                                     chunks=True, dtype=np.float32)

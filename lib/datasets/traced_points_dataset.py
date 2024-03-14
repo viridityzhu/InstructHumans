@@ -17,12 +17,8 @@ class TracedPointsDataset(Dataset):
     ):
         """Construct dataset. This dataset also needs to be initialized.
         """
-
+        self.code_idx = code_idx
         self.initialization_mode = None
-        self.label_map = {
-            15:0, 17:1, 1:0, 4:1, 22:0, 32:1, 34:2, 5:0, 8:1, 9:0, 33:1, 42:2, 97:3
-            }
-        self.mapped_subject_idx = self.label_map[code_idx]
         self.current_batch_data = None 
 
     def init_from_h5(self, dataset_path):
@@ -39,6 +35,15 @@ class TracedPointsDataset(Dataset):
                 self.n_random_views = f['xs'].shape[3]
             except:
                 raise ValueError("[Error] Can't load from h5 dataset")
+            try:
+                subject_list = f['subject_list'][:]
+                self.label_map = {subject: idx for idx, subject in enumerate(subject_list)}
+            except:
+                # temporary hack for compatibility with old
+                self.label_map = {
+                            15:0, 17:1, 1:0, 4:1, 22:0, 32:1, 34:2, 5:0, 8:1, 9:0, 33:1, 42:2, 97:3
+                            }
+        self.mapped_subject_idx = self.label_map[self.code_idx]
         self.resample_batch()
         self.initialization_mode = "h5"
 

@@ -83,3 +83,5 @@ ip2p:
   edit_checkpoint_file: 'checkpoint.pth.tar'
   visualize_more: True
   most_efficient: False
+  use_traced_point_dataset: True
+  traced_points_data_root: 'prepared_dataset.h5'

@@ -198,6 +198,7 @@ class InstructEditor(nn.Module):
                 elif i == 2: # after that, compute weights of regions
                     self.cal_view_weight(acc_tex_grad_magn, random_views_total)
                     
+            # ! deprecated since preparing the traced point dataset speed up a lot!
             if not self.cfg.use_traced_point_dataset:
                 _idx = torch.tensor([code_idx], dtype=torch.long, device = torch.device('cuda')).repeat(random_views_total).detach() # [id]
                 start = time.time()
