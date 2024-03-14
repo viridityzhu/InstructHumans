@@ -210,7 +210,7 @@ def parse_options():
                             help='zoom_in_face')
     instruct_humans_group.add_argument('--load_edit_checkpoint', type=bool, default=False, 
                             help='load_edit_checkpoint')
-    instruct_humans_group.add_argument('--save_edit_freq', type=int, default=100, 
+    instruct_humans_group.add_argument('--save_edit_freq', type=int, default=20, 
                             help='Frequency to save edit checkpoint')
     instruct_humans_group.add_argument('--random_views', type=int, default=50, 
                             help='no. random views in each edit iteration')

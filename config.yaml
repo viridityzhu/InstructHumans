@@ -84,4 +84,4 @@ instruct_humans:
   visualize_more: True
   most_efficient: False
   use_traced_point_dataset: True
-  traced_points_data_root: 'prepared_dataset.h5'
+  traced_points_data_root: 'prepared_tracing.h5'
