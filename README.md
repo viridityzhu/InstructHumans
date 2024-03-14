@@ -111,11 +111,13 @@ python -m test.test_cp \
     --instruction "Turn him into Tolkien Elf" \
     --id 32 \
     --caption_ori "A photo of a person" --caption_tgt "A photo of a Tolkien Elf"
+    --cal-metric 1 \
+    --render-more 0
 ```
 
-Basically, the supported arguments are the same as `edit.py`.
-
-- We save the evaluation metrics via *wandb*. But if wandb is disabled, the metrics should be printed instead.
+- `--cal-metric`: whether to calculate the evaluation metrics. If wandb is disabled, the metrics are printed; otherwise they are uploaded to wandb.
+- `--render-more`: by default, for both the original and edited humans, we render 15 images for visualization, and they are saved in the same directory as the checkpoint file. If you want to render more images, you can set this to `1`.
+- Basically, the other supported arguments are the same as `edit.py`.
 
 ## Demo for animating an edited human
 

@@ -158,7 +158,7 @@ def render_more(n_views, width, idx, evaluator):
                         ray_d_images_b.view(remainder, -1, 3))
         xLs.append(x)
         hitLs.append(hit)
-        log.info(f"Rat tracing for last {-remainder} finished in {time.time()-start} seconds.")
+        log.info(f"Ray tracing for last {-remainder} finished in {time.time()-start} seconds.")
         x = torch.cat(xLs)
         hit = torch.cat(hitLs)
         start = time.time()
