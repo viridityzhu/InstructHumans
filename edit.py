@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     parser = parse_options()
     parser.add_argument('--pretrained-root', type=str, default='checkpoints/demo', help='pretrained model path')
-    parser.add_argument('--save-path', type=str, default='clown32', required=False, help='path to save the outputs')
+    parser.add_argument('--save-path', type=str, default='checkpoints/clown32', required=False, help='path to save the outputs')
     parser.add_argument('--model-name', type=str, default='model-1000.pth', help='load model name')
     parser.add_argument('--instruction', type=str, default='Turn him into a clown', required=True, help='load model name')
     parser.add_argument('--id', type=int, default=32, help='id of the human')
