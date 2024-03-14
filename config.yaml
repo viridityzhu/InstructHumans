@@ -72,7 +72,7 @@ validation:
 
 wandb:
   wandb: True
-  wandb_name: 'custom-test'
+  wandb_name: 'InstructHumans'
 
 ip2p:
   ip2p_device: None

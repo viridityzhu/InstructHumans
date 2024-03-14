@@ -247,9 +247,9 @@ def parse_options():
                             help='the rate for the min timestep to be sampled from for denoising')
     instruct_humans_group.add_argument('--max_step_rate', type=float, default=0.80, 
                             help='the rate for the max timestep to be sampled from for denoising')
-    instruct_humans_group.add_argument('--caption_ori', type=str, 
+    instruct_humans_group.add_argument('--caption_ori', type=str, default="A photo of a person",
                             help='caption text to describe the original human.')
-    instruct_humans_group.add_argument('--caption_tgt', type=str, 
+    instruct_humans_group.add_argument('--caption_tgt', type=str, default="A photo of a clown",
                             help='caption text to describe the target human.')
     instruct_humans_group.add_argument('--traced_points_data_root', type=str, default='prepared_tracing.h5',
                             help='the prepared traced points data file.')

@@ -33,8 +33,7 @@ import wandb
 
 CONSOLE = Console(width=120)
 
-# Instead of the original diffusers, we import our own modified one, which outputs attention map
-from ..utils.diffusers import (
+from diffusers import (
     DDIMScheduler,
     StableDiffusionInstructPix2PixPipeline,
 )
