@@ -1,27 +1,29 @@
-# InstructHumans
+# InstructHumans: Editing Animated 3D Human Textures with Instructions
 ## Installation
-Our code has been tested with PyTorch 2.0.1, CUDA 11.7.
+Our code has been tested with PyTorch 2.0.1, CUDA 11.7. But other versions should also be fine.
 
-- Create conda environment:
+- Clone this repo and create conda environment:
 	```bash
+	git clone https://github.com/viridityzhu/InstructHumans.git
+	cd InstructHumans
 	conda env create -f environment.yml
-	```
-
-	Or update your existing env via:
-	```bash
 	conda activate InstructHumans
-	conda env update -f environment.yml
 	```
 
-- `kaolin` may require to be installed separately. Check their docs - [Installation](https://kaolin.readthedocs.io/en/latest/notes/installation.html). They provided prebuilt wheels for some older versions of CUDA and pytorch.
+- `kaolin` requires to be installed separately. Check their docs - [Installation](https://kaolin.readthedocs.io/en/latest/notes/installation.html). They provided prebuilt wheels for some older versions of CUDA and pytorch.
 
-	```bash
+	```sh
 	TORCH_VER="2.0.1"
 	CUDA_VER="117"
 	pip install kaolin==0.14.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-$TORCH_VER\_cu$CUDA_VER\.html
 	```
 
-	Note the latest CUDA version supported by kaolin is 11.7. If your CUDA version (see `nvcc -V`) is unluckily too new and incompatible, you may install an older version in the conda environment:
+	<details>
+	<summary>Click me for issues with kaolin installation</summary>
+
+	If you encounter error when importing kaolin: `from kaolin import _C ImportError`, it may due to incompatibility with your CUDA version.
+
+	Note we use cuda version 11.7. Try install the specific version in the conda environment:
 
 	```bash
 	conda install -c conda-forge cudatoolkit=11.7
@@ -32,11 +34,14 @@ Our code has been tested with PyTorch 2.0.1, CUDA 11.7.
 	conda install pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 pytorch-cuda=11.7 -c pytorch -c nvidia
 	```
 
-- Other missing packages
-	```bash
-	pip install trimesh tinyobjloader==2.0.0rc8 wandb rich jaxtyping
-	pip install nerfstudio[gen]
-	```
+	Then, reinstall kaolin with `--force` option.
+
+
+	</details>
+
+
+
+
 
 ## Data preparation
 
@@ -84,21 +89,21 @@ Simply run the below command:
 ```sh
 python edit.py --instruction "Turn him into a clown" --id 32
 ```
-Here are some configuration flags you can use; otherwise you can find full default settings in `config.yaml` and descriptions in `lig/utils/config.py`:
+Here are some configuration flags you can use; otherwise you can find full default settings in `config.yaml` and descriptions in `lib/utils/config.py`:
 * `--instruction`: textual editing instruction.
 * `--id`: human subject index. Use this to indicate the original human to be edited. They should be included in the pretrained checkpoints of CustomHumans.
 * `--save-path `: path to the folder to save the checkpoints.
 * `--config`: path to the config file. Default is `config.yaml`
 * `--wandb`: we use wandb for monitoring the training. Activate this flag if you want to use it.
-* `--caption_ori` and `--caption_tgt`: these do not affect the editing at all, but helps calculate evaluation metrics. They are captions describing the original or target images. 
+* `--caption_ori` and `--caption_tgt`: these do not affect the editing at all, but help calculate evaluation metrics. They are captions describing the original or target images. 
 * `--sampl_strategy `: to select SDS-E / SDS-E' / SDS to use, set "dt+ds" / "dt+ds2" / "ori", respectively.
 
 ### Test a pre-trained checkpoint
 
-- We provide `test/test_cp.py` for testing a pre-trained checkpoint. Usage:
+- We provide `test/test_cp.py` to test a pre-trained checkpoint. Usage:
 
 ```sh
-python test_cp.py --edit_checkpoint_file path/to/checkpoint_step1000.pth.tar \
+python test_cp.py --edit_checkpoint_file path/to/checkpoint.pth.tar \
     --instruction "Make the person into wearing traditional Japanese kimono" \
     --id 32 --caption_ori "A photo of a person" --caption_tgt "A person wearing traditional Japanese kimono"
 ```
@@ -117,8 +122,8 @@ Basically, the supported arguments are the same as `edit.py`.
 	python -m test.drive_motion \
 		--id 9 # subject id (only affect the geometry) \
 		--load_edit_checkpoint True \
-		--edit_checkpoint_file checkpoints/joker9_decom1_weightcam/cp/checkpoint_step1000.pth.tar  # texture checkpoint \
-		--motion-folder game_motion/subset_0001/Dance_Back # many obj files defining the motion \
+		--edit_checkpoint_file checkpoints/joker9/cp/checkpoint_step1000.pth.tar  # texture checkpoint \
+		--motion-folder game_motion/subset_0001/Dance_Back # many obj files defining the motion, prepared in step 1 \
 		--output-name joker9 # output folder's name \
 		--n_views 4 # rendered views per frame \
 	```
@@ -131,4 +136,4 @@ Basically, the supported arguments are the same as `edit.py`.
 		--output-name suit33_motion1 \
 		--n_views 1 \
 	```
-	Once down, you'll get generated rendered per frame images as well as an mp4 file in `test/outputs/`.
+	Once done, you'll get generated rendered per frame images as well as an mp4 file in `test/outputs/`.
