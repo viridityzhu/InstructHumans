@@ -369,7 +369,7 @@ class InstructPix2Pix(nn.Module):
         # decode latents to get edited image
         with torch.no_grad():
             # get previous sample
-            latents_prev = self.scheduler.step(curr_term_edit, t, latents).prev_sample
+            latents_prev = self.scheduler.step(curr_term_edit.cpu(), t.cpu(), latents.cpu()).prev_sample
 
             if noise_pred.dtype == torch.float16:
                 latents_prev = latents_prev.half()

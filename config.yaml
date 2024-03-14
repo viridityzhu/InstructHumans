@@ -74,7 +74,7 @@ wandb:
   wandb: True
   wandb_name: 'InstructHumans'
 
-ip2p:
+instruct_humans:
   ip2p_device: None
   ip2p_use_full_precision: False
   show_edited_img: True

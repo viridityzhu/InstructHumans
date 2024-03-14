@@ -82,7 +82,7 @@ python -m tools.prepare_tracing --subject_list [32]
 
 `--subject_list [9,32]` specifies subject ids to be processed. Processing one subject takes around 30 minutes. (This will pre-sample intermediate results of ray tracing for each human subject and cache them in a h5 file. This way, we can avoid repeating ray tracing and extremely speed up the editing procedure.)
 
-After this, you can specify the data file by `--traced_points_data_root prepared_dataset.h5` when editing.
+After this, you can specify the data file by `--traced_points_data_root prepared_tracing.h5` when editing.
 
 ### Edit human with instruction
 

@@ -260,7 +260,7 @@ if __name__ == "__main__":
     parser = parse_options()
 
     parser.add_argument('--subject_list', type=str, default='[32]', help='list of subjects to be processed')
-    parser.add_argument('--output-path', type=str, default='prepared_dataset.h5', help='output path to H5 file')
+    parser.add_argument('--output-path', type=str, default='prepared_tracing.h5', help='output path to H5 file')
     parser.add_argument('--pretrained-root', type=str, default='checkpoints/demo', help='pretrained model path')
     parser.add_argument('--model-name', type=str, default='model-1000.pth', help='load model name')
     
