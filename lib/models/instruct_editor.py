@@ -89,6 +89,323 @@ class InstructEditor(nn.Module):
         self.smpl_F = trainer.smpl_F.clone().detach().cpu()
         self.smoothness_loss = SmoothnessLoss(trainer.smpl_V[0].size(0), self.smpl_F, device=self.ip2p_device)
 
+    def editing_by_instruction(self, code_idx: int, instruction: str, target_smpl_obj=None, num_steps=200):
+        """Fitting the color latent code to the rendered images
+           Store the optimzed code in the code_idx-th entry of the codebook.
+           Given target images of n_views (target_dict contains rgb, coord, and mask),
+           this function takes out texture features of given subject, and train it, and then put it back.
+        """
+
+        torch.cuda.empty_cache()
+
+        start = time.time()
+        # * backup config file
+        config_dict = vars(self.cfg)
+        yaml_file_path = os.path.join(self.log_dir, 'config.yaml')
+        with open(yaml_file_path, 'w') as file:
+            yaml.dump(config_dict, file, default_flow_style=False)
+        
+        # ! ------- Preparation --------
+        # * Text embedding
+        # load base text embedding using classifier free guidance
+        text_embedding = self.ip2p.pipe._encode_prompt(
+            instruction, device=self.ip2p_device, num_images_per_prompt=1, do_classifier_free_guidance=True, negative_prompt=""
+        )
+
+        # * texture latent codes
+        # get tex_feats of idx-th subject from the codebook
+        tex_feats= self.rgb_field.get_feature_by_idx(code_idx).clone().unsqueeze(0).detach().data
+        tex_feats.requires_grad = True
+        _idx = torch.tensor([code_idx], dtype=torch.long, device = torch.device('cuda')).detach() # [id]
+
+        params = []
+        params.append({'params': tex_feats, 'lr': self.cfg.lr_tex_code})
+
+        # * optimizer
+        optimizer = torch.optim.Adam(params, betas=(0.9, 0.999))
+        step_start = 0
+        # Initialize LPIPS loss function
+        lpips_loss_fn = lpips.LPIPS(net='vgg').cuda()  # Use VGG network for LPIPS
+
+        # * load checkpoint
+        if self.cfg.load_edit_checkpoint:
+            step_start, tex_feats_checkpoint, optimizer_state_checkpoint, rgb_checkpoint = self.load_edit_checkpoint(self.cfg.edit_checkpoint_file)
+            if tex_feats_checkpoint is not None:
+                tex_feats = tex_feats_checkpoint
+                tex_feats.requires_grad = True
+            # fix: Reinitialize the optimizer with the updated tensors
+            params = []
+            params.append({'params': tex_feats, 'lr': self.cfg.lr_tex_code})
+            if self.cfg.train_nerf:
+                import copy
+                # copy ori rgb field because we need ori images
+                ori_rgb_field = copy.deepcopy(self.rgb_field).to(self.ip2p_device)
+                # load nerf params
+                if rgb_checkpoint is not None:
+                    self.rgb_field.load_state_dict(rgb_checkpoint)
+                decoder_params = list(self.rgb_field.decoder.parameters())
+                params.append({'params': decoder_params,
+                                'lr': self.cfg.lr_nerf,
+                                "weight_decay": self.cfg.weight_decay_nerf})
+            optimizer = torch.optim.Adam(params, betas=(0.9, 0.999))
+            if optimizer_state_checkpoint is not None:
+                optimizer_state_current = optimizer.state_dict()
+                optimizer_state_current['state'].update(optimizer_state_checkpoint['state'])
+                optimizer_state_current['param_groups'][0].update(optimizer_state_checkpoint['param_groups'][0])
+                optimizer.load_state_dict(optimizer_state_current)
+            if step_start is None:
+                step_start = 0
+
+        # * SMPL mesh vertices
+        if target_smpl_obj is not None:
+            smpl_V, _ = load_obj(target_smpl_obj, load_materials=False)
+            smpl_V = smpl_V.cuda()
+        else:
+            smpl_V = self.rgb_field.get_smpl_vertices_by_idx(code_idx)
+
+        # * Camera view number
+        n_views_body = self.cfg.random_views
+        if self.cfg.zoom_in_face: # additional 20% views for face
+            n_views_face = int(self.cfg.random_views * 0.2)
+            random_views_total = n_views_body + n_views_face
+        if self.cfg.grad_aware_cam_sampl:
+            random_views_total = self.cfg.random_views
+
+        if self.cfg.use_traced_point_dataset:
+            self.tracedPointDataset = TracedPointsDataset(code_idx)
+            self.tracedPointDataset.init_from_h5(self.cfg.traced_points_data_root)
+
+        # * sampling strategy choice. dynamic t sampling, sds, or original
+        self.ip2p.init_sampling_strategy(self.cfg.sampl_strategy, total_it=step_start + num_steps, M=self.cfg.mode_change_step, M2=self.cfg.mode_change_step2, min_step_r=self.cfg.min_step_rate, max_step_r=self.cfg.max_step_rate)
+
+        end = time.time()
+        log.info(f"Preparation finished in {end-start} seconds.") # 1.9
+        # * prepare original rendered images for evaluation
+        self.render_2D(code_idx, epoch=-1, fix=True, write_to_wandb=True)
+
+        # !--------------- Edit loop start ------------
+        loop = tqdm(range(step_start + 1, step_start + 1 + num_steps))
+        tex_feats_old = None
+        vis = Visualizer()
+        log.info(f"Edit {num_steps * random_views_total} iterations in total.")
+
+        for i in loop:
+
+            # * gradient aware camera sampling
+            if self.cfg.grad_aware_cam_sampl:
+                if i == 1: # initialize accumulated grad magnitude
+                    acc_tex_grad_magn = torch.zeros(tex_feats.shape[1], device=self.ip2p_device)
+                elif i == 2: # after that, compute weights of regions
+                    self.cal_view_weight(acc_tex_grad_magn, random_views_total)
+                    
+            if not self.cfg.use_traced_point_dataset:
+                _idx = torch.tensor([code_idx], dtype=torch.long, device = torch.device('cuda')).repeat(random_views_total).detach() # [id]
+                start = time.time()
+                # * Random camera views
+                # Randomly generate n_views images
+                with torch.no_grad():
+
+                    ray_o_images, ray_d_images = random_camera_rays(smpl_V, n_views=n_views_body, width=self.cfg.width)
+
+                    if self.cfg.zoom_in_face:
+                        head_V = seg_verts(smpl_V, 'head')
+                        ray_o_images_face, ray_d_images_face = random_camera_rays(head_V, n_views=n_views_face, width=self.cfg.width, is_head=True)
+                        ray_o_images = torch.cat((ray_o_images, ray_o_images_face), dim=0)
+                        ray_d_images = torch.cat((ray_d_images, ray_d_images_face), dim=0)
+
+                    ray_o_images = ray_o_images.view(random_views_total, -1, 3) # n_views, 400, 400, 3 -> n_views, 400 * 400, 3
+                    ray_d_images = ray_d_images.view(random_views_total, -1, 3)
+
+
+                end = time.time()
+                log.info(f"Random view generation for all views finished in {end-start} seconds.") # 0.04
+
+                start = time.time()
+                # * trace rays and render the original image
+                with torch.no_grad():
+                    xs, hits = self.tracer(self.sdf_field.forward, _idx,
+                                    ray_o_images,
+                                    ray_d_images)
+                    if self.cfg.train_nerf:
+                        rgb_2ds = ori_rgb_field.forward(xs.detach(), _idx) * hits
+                    else:
+                        rgb_2ds = self.rgb_field.forward(xs.detach(), _idx) * hits
+
+                end = time.time()
+                log.info(f"Ray tracing for current view finished in {end-start} seconds.") # 4.8
+
+            # !--------------- n views loop start ------------
+            if self.cfg.use_traced_point_dataset:
+                self.tracedPointDataset.resample_batch()
+
+            if self.cfg.grad_aware_cam_sampl:
+                self.weighted_cam_sampl(calc_weight = i==1)
+
+            optimizer.zero_grad()
+            for no_view, region_and_idx in enumerate(self.sample_indices):
+
+                start = time.time()
+                if self.cfg.use_traced_point_dataset:
+                    self.tracedPointDataset.set_fix(False)
+                    x, hit = self.tracedPointDataset[region_and_idx] # actually the views are already randomed in the dataset. But we random again here to make sure each time they are different
+                    x, hit = x.to(self.ip2p_device), hit.to(self.ip2p_device)
+
+                    if self.cfg.train_nerf:
+                        rgb_2d = ori_rgb_field.forward(x.detach(), _idx) * hit
+                    else:
+                        rgb_2d = self.rgb_field.forward(x.unsqueeze(0).detach(), _idx) * hit.unsqueeze(0)
+                    pred_rgb = self.rgb_field.forward_fitting(x.unsqueeze(0).detach(), tex_feats, smpl_V.unsqueeze(0)) * hit.unsqueeze(0)
+                else:
+                    raise NotImplementedError("This feature has not been implemented yet.")
+
+                # * images process
+                # reshape images
+                # B x w*w x 3 -> B x w x w x 3
+                rgb_2d = rgb_2d.view(1, self.cfg.width, self.cfg.width, 3).permute(0, 3, 1, 2)
+                pred_rgb = pred_rgb.view(1, self.cfg.width, self.cfg.width, 3).permute(0, 3, 1, 2)
+
+                # crop background
+                mask = hit.view(1, self.cfg.width, self.cfg.width)
+                rgb_2d = crop_to_mask_tensor(rgb_2d, mask)
+                pred_rgb = crop_to_mask_tensor(pred_rgb, mask)
+
+                # convert to half precision
+                if not self.cfg.ip2p_use_full_precision:
+                    rgb_2d = rgb_2d.half()
+                    pred_rgb = pred_rgb.half()
+
+                # * save images
+                if not self.cfg.most_efficient and not no_view % self.cfg.show_edited_img_freq:
+                    Image.fromarray((rgb_2d.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
+                            os.path.join(self.image_dir, 'ori', 'step-%03d_view-%03d_render_ori-%03d_.png' % (i, no_view, code_idx)) )
+                if not no_view % self.cfg.show_edited_img_freq:
+                    Image.fromarray((pred_rgb.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
+                            os.path.join(self.image_dir, 'pred', 'step-%03d_view-%03d_render_pred-%03d_.png' % (i, no_view, code_idx)) )
+
+                end = time.time()
+                log.debug(f"Render finished in {end-start} seconds.") # 0.08
+                # !------------- Calculate SDS and other losses ----------
+
+                start = time.time()
+                # * get sds loss
+                sds_dict = self.ip2p.compute_sds(
+                                text_embedding,
+                                pred_rgb,
+                                rgb_2d,
+                                current_it = i,
+                                guidance_scale=self.cfg.guidance_scale,
+                                image_guidance_scale=self.cfg.image_guidance_scale,
+                                lower_bound=self.cfg.lower_bound,
+                                upper_bound=self.cfg.upper_bound,
+                            )
+                
+                end = time.time()
+                log.debug(f"SDS computation finished in {end-start} seconds.") # 0.6-1
+                start = time.time()
+                loss_ls = []
+                total_loss = sds_dict['loss_sds']
+                loss_ls.append(('sds', sds_dict['loss_sds'].item()))
+
+                # save image
+                if not no_view % self.cfg.show_edited_img_freq:
+                    prev_img = sds_dict['prev_img'] # edited image through the random denoising step
+                    Image.fromarray((prev_img.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
+                            os.path.join(self.image_dir, 'one_step_edit', 'step-%03d_view-%03d_one_step_edit-%03d_.png' % (i, no_view, code_idx)) )
+
+                # generate the edited image of the total diffusion steps (20) for visualization
+                if not self.cfg.most_efficient and self.cfg.show_edited_img and not no_view % self.cfg.show_edited_img_freq:
+                    edited_img = self.ip2p.edit_image( # by default, diffusion steps = 20
+                                text_embedding.to(self.ip2p_device),
+                                pred_rgb.to(self.ip2p_device),
+                                rgb_2d.to(self.ip2p_device),
+                                guidance_scale=self.cfg.guidance_scale,
+                                image_guidance_scale=self.cfg.image_guidance_scale,
+                                lower_bound=self.cfg.lower_bound,
+                                upper_bound=self.cfg.upper_bound,
+                    )
+                    Image.fromarray((edited_img.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
+                            os.path.join(self.image_dir, 'edited', 'step-%03d_view-%03d_edit_img-%03d_.png' % (i, no_view, code_idx)) )
+
+                # * get regu loss
+                if i > 1 and self.cfg.loss_reg_weight > 0.:
+                    loss_reg = self.cfg.loss_reg_weight * (tex_feats**2).mean()
+                    loss_ls.append(('regu', loss_reg.item()))
+                else:
+                    loss_reg = 0.
+                total_loss += loss_reg
+
+                # * get smoothness loss
+                if i > 1 and self.cfg.loss_smooth_weight > 0. and tex_feats_old is not None:
+                    delta_tex_feats = tex_feats - tex_feats_old
+                    smoothness_loss = self.smoothness_loss.cal(delta_tex_feats, self.cfg.loss_smooth_weight)
+                    total_loss += smoothness_loss
+                    loss_ls.append(('smooth', smoothness_loss.item()))
+                else:
+                    smoothness_loss = 0.
+
+                if not self.cfg.most_efficient and self.cfg.visualize_more and not no_view % self.cfg.show_edited_img_freq:
+                    pred_rgb.retain_grad() # for visualization
+
+                end = time.time()
+                log.debug(f"loss caculation finished in {end-start} seconds.") # 0.006
+
+                start = time.time()
+                total_loss = total_loss / 5
+                total_loss.backward()
+
+                # * generate visualization plot
+                if not self.cfg.most_efficient and self.cfg.visualize_more and not no_view % self.cfg.show_edited_img_freq:
+                    grad_sds = pred_rgb.grad.detach().clone()
+                    tex_grad_sds = tex_feats.grad.detach().clone()
+                    vis(i, grad_sds, rgb_2d, pred_rgb, prev_img, edited_img,
+                        tex_grad_sds, smpl_V.cpu(),
+                        save_path=os.path.join(self.image_dir, 'vis', 'step-%03d_view-%03d_vis-%03d_.png' % (i, no_view, code_idx)))
+                
+                # * accumulate vertex gradients in the 1st iteration
+                if self.cfg.grad_aware_cam_sampl and i == 1:
+                    tex_grad_sds = tex_feats.grad.detach().clone()
+                    acc_tex_grad_magn += torch.sqrt(torch.sum(tex_grad_sds**2, dim=-1)).squeeze()
+
+                # * store old texture latents for the smoothness loss in next iteration
+                if self.cfg.loss_smooth_weight > 0.:
+                    tex_feats_old = tex_feats.clone().detach()
+
+                end = time.time()
+                log.debug(f"loss backward finished in {end-start} seconds.") # 0.04
+
+                if no_view % 5 == 0:
+                    start = time.time()
+                    optimizer.step()
+
+                    if not self.cfg.most_efficient and self.cfg.visualize_more and not no_view % self.cfg.show_edited_img_freq:
+                        # Clear the gradients of 'pred_rgb'
+                        if pred_rgb.grad is not None:
+                            pred_rgb.grad = None
+
+                    end = time.time()
+                    optimizer.zero_grad()
+                    log.debug(f"optimizer step finished in {end-start} seconds.") # 0.04
+
+                # * log results
+                self.log(loop, loss_ls, i, step_start + num_steps, region_and_idx, no_view, len(self.sample_indices))
+
+
+            # * save checkpoint
+            if i % self.cfg.save_edit_freq == 0:
+                self.save_edit_checkpoint(i, tex_feats, optimizer, filename=self.cfg.edit_checkpoint_file)
+                with torch.no_grad():
+                    ori_tex_feats= self.rgb_field.get_feature_by_idx(code_idx).clone().unsqueeze(0).detach().data
+                    self.rgb_field.replace_feature_by_idx(code_idx, tex_feats)
+                self.render_2D(code_idx, epoch=i, fix=True, write_to_wandb=True)
+                with torch.no_grad(): # back to original features
+                    self.rgb_field.replace_feature_by_idx(code_idx, ori_tex_feats)
+
+
+        # * replace the original latent codes by the edited one. This can be used later for rendering
+        with torch.no_grad():
+            self.rgb_field.replace_feature_by_idx(code_idx, tex_feats)
+
+
     def _marching_cubes (self, geo_idx=0, tex_idx=None, subdivide=True, res=300) -> trimesh.Trimesh:
         '''Marching cubes to generate mesh.
         Args:
@@ -657,321 +974,6 @@ class InstructEditor(nn.Module):
         wandb.log({'region_weight/views': self.views_per_region}, step=1)
 
 
-    def editing_by_instruction(self, code_idx: int, instruction: str, target_smpl_obj=None, num_steps=200):
-        """Fitting the color latent code to the rendered images
-           Store the optimzed code in the code_idx-th entry of the codebook.
-           Given target images of n_views (target_dict contains rgb, coord, and mask),
-           this function takes out texture features of given subject, and train it, and then put it back.
-        """
-
-        torch.cuda.empty_cache()
-
-        start = time.time()
-        # * backup config file
-        config_dict = vars(self.cfg)
-        yaml_file_path = os.path.join(self.log_dir, 'config.yaml')
-        with open(yaml_file_path, 'w') as file:
-            yaml.dump(config_dict, file, default_flow_style=False)
-        
-        # ! ------- Preparation --------
-        # * Text embedding
-        # load base text embedding using classifier free guidance
-        text_embedding = self.ip2p.pipe._encode_prompt(
-            instruction, device=self.ip2p_device, num_images_per_prompt=1, do_classifier_free_guidance=True, negative_prompt=""
-        )
-
-        # * texture latent codes
-        # get tex_feats of idx-th subject from the codebook
-        tex_feats= self.rgb_field.get_feature_by_idx(code_idx).clone().unsqueeze(0).detach().data
-        tex_feats.requires_grad = True
-        _idx = torch.tensor([code_idx], dtype=torch.long, device = torch.device('cuda')).detach() # [id]
-
-        params = []
-        params.append({'params': tex_feats, 'lr': self.cfg.lr_tex_code})
-
-        # * optimizer
-        optimizer = torch.optim.Adam(params, betas=(0.9, 0.999))
-        step_start = 0
-        # Initialize LPIPS loss function
-        lpips_loss_fn = lpips.LPIPS(net='vgg').cuda()  # Use VGG network for LPIPS
-
-        # * load checkpoint
-        if self.cfg.load_edit_checkpoint:
-            step_start, tex_feats_checkpoint, optimizer_state_checkpoint, rgb_checkpoint = self.load_edit_checkpoint(self.cfg.edit_checkpoint_file)
-            if tex_feats_checkpoint is not None:
-                tex_feats = tex_feats_checkpoint
-                tex_feats.requires_grad = True
-            # fix: Reinitialize the optimizer with the updated tensors
-            params = []
-            params.append({'params': tex_feats, 'lr': self.cfg.lr_tex_code})
-            if self.cfg.train_nerf:
-                import copy
-                # copy ori rgb field because we need ori images
-                ori_rgb_field = copy.deepcopy(self.rgb_field).to(self.ip2p_device)
-                # load nerf params
-                if rgb_checkpoint is not None:
-                    self.rgb_field.load_state_dict(rgb_checkpoint)
-                decoder_params = list(self.rgb_field.decoder.parameters())
-                params.append({'params': decoder_params,
-                                'lr': self.cfg.lr_nerf,
-                                "weight_decay": self.cfg.weight_decay_nerf})
-            optimizer = torch.optim.Adam(params, betas=(0.9, 0.999))
-            if optimizer_state_checkpoint is not None:
-                optimizer_state_current = optimizer.state_dict()
-                optimizer_state_current['state'].update(optimizer_state_checkpoint['state'])
-                optimizer_state_current['param_groups'][0].update(optimizer_state_checkpoint['param_groups'][0])
-                optimizer.load_state_dict(optimizer_state_current)
-            if step_start is None:
-                step_start = 0
-
-        # * SMPL mesh vertices
-        if target_smpl_obj is not None:
-            smpl_V, _ = load_obj(target_smpl_obj, load_materials=False)
-            smpl_V = smpl_V.cuda()
-        else:
-            smpl_V = self.rgb_field.get_smpl_vertices_by_idx(code_idx)
-
-        # * Camera view number
-        n_views_body = self.cfg.random_views
-        if self.cfg.zoom_in_face: # additional 20% views for face
-            n_views_face = int(self.cfg.random_views * 0.2)
-            random_views_total = n_views_body + n_views_face
-        if self.cfg.grad_aware_cam_sampl:
-            random_views_total = self.cfg.random_views
-
-        if self.cfg.use_traced_point_dataset:
-            self.tracedPointDataset = TracedPointsDataset(code_idx)
-            self.tracedPointDataset.init_from_h5(self.cfg.traced_points_data_root)
-
-        # * sampling strategy choice. dynamic t sampling, sds, or original
-        self.ip2p.init_sampling_strategy(self.cfg.sampl_strategy, total_it=step_start + num_steps, M=self.cfg.mode_change_step, M2=self.cfg.mode_change_step2, min_step_r=self.cfg.min_step_rate, max_step_r=self.cfg.max_step_rate)
-
-        end = time.time()
-        log.info(f"Preparation finished in {end-start} seconds.") # 1.9
-        # * prepare original rendered images for evaluation
-        self.render_2D(code_idx, epoch=-1, fix=True, write_to_wandb=True)
-
-        # !--------------- Edit loop start ------------
-        loop = tqdm(range(step_start + 1, step_start + 1 + num_steps))
-        tex_feats_old = None
-        vis = Visualizer()
-        log.info(f"Edit {num_steps * random_views_total} iterations in total.")
-
-        for i in loop:
-
-            # * gradient aware camera sampling
-            if self.cfg.grad_aware_cam_sampl:
-                if i == 1: # initialize accumulated grad magnitude
-                    acc_tex_grad_magn = torch.zeros(tex_feats.shape[1], device=self.ip2p_device)
-                elif i == 2: # after that, compute weights of regions
-                    self.cal_view_weight(acc_tex_grad_magn, random_views_total)
-                    
-            if not self.cfg.use_traced_point_dataset:
-                _idx = torch.tensor([code_idx], dtype=torch.long, device = torch.device('cuda')).repeat(random_views_total).detach() # [id]
-                start = time.time()
-                # * Random camera views
-                # Randomly generate n_views images
-                with torch.no_grad():
-
-                    ray_o_images, ray_d_images = random_camera_rays(smpl_V, n_views=n_views_body, width=self.cfg.width)
-
-                    if self.cfg.zoom_in_face:
-                        head_V = seg_verts(smpl_V, 'head')
-                        ray_o_images_face, ray_d_images_face = random_camera_rays(head_V, n_views=n_views_face, width=self.cfg.width, is_head=True)
-                        ray_o_images = torch.cat((ray_o_images, ray_o_images_face), dim=0)
-                        ray_d_images = torch.cat((ray_d_images, ray_d_images_face), dim=0)
-
-                    ray_o_images = ray_o_images.view(random_views_total, -1, 3) # n_views, 400, 400, 3 -> n_views, 400 * 400, 3
-                    ray_d_images = ray_d_images.view(random_views_total, -1, 3)
-
-
-                end = time.time()
-                log.info(f"Random view generation for all views finished in {end-start} seconds.") # 0.04
-
-                start = time.time()
-                # * trace rays and render the original image
-                with torch.no_grad():
-                    xs, hits = self.tracer(self.sdf_field.forward, _idx,
-                                    ray_o_images,
-                                    ray_d_images)
-                    if self.cfg.train_nerf:
-                        rgb_2ds = ori_rgb_field.forward(xs.detach(), _idx) * hits
-                    else:
-                        rgb_2ds = self.rgb_field.forward(xs.detach(), _idx) * hits
-
-                end = time.time()
-                log.info(f"Ray tracing for current view finished in {end-start} seconds.") # 4.8
-
-            # !--------------- n views loop start ------------
-            if self.cfg.use_traced_point_dataset:
-                self.tracedPointDataset.resample_batch()
-
-            if self.cfg.grad_aware_cam_sampl:
-                self.weighted_cam_sampl(calc_weight = i==1)
-
-            optimizer.zero_grad()
-            for no_view, region_and_idx in enumerate(self.sample_indices):
-
-                start = time.time()
-                if self.cfg.use_traced_point_dataset:
-                    self.tracedPointDataset.set_fix(False)
-                    x, hit = self.tracedPointDataset[region_and_idx] # actually the views are already randomed in the dataset. But we random again here to make sure each time they are different
-                    x, hit = x.to(self.ip2p_device), hit.to(self.ip2p_device)
-
-                    if self.cfg.train_nerf:
-                        rgb_2d = ori_rgb_field.forward(x.detach(), _idx) * hit
-                    else:
-                        rgb_2d = self.rgb_field.forward(x.unsqueeze(0).detach(), _idx) * hit.unsqueeze(0)
-                    pred_rgb = self.rgb_field.forward_fitting(x.unsqueeze(0).detach(), tex_feats, smpl_V.unsqueeze(0)) * hit.unsqueeze(0)
-                else:
-                    raise NotImplementedError("This feature has not been implemented yet.")
-
-                # * images process
-                # reshape images
-                # B x w*w x 3 -> B x w x w x 3
-                rgb_2d = rgb_2d.view(1, self.cfg.width, self.cfg.width, 3).permute(0, 3, 1, 2)
-                pred_rgb = pred_rgb.view(1, self.cfg.width, self.cfg.width, 3).permute(0, 3, 1, 2)
-
-                # crop background
-                mask = hit.view(1, self.cfg.width, self.cfg.width)
-                rgb_2d = crop_to_mask_tensor(rgb_2d, mask)
-                pred_rgb = crop_to_mask_tensor(pred_rgb, mask)
-
-                # convert to half precision
-                if not self.cfg.ip2p_use_full_precision:
-                    rgb_2d = rgb_2d.half()
-                    pred_rgb = pred_rgb.half()
-
-                # * save images
-                if not self.cfg.most_efficient and not no_view % self.cfg.show_edited_img_freq:
-                    Image.fromarray((rgb_2d.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
-                            os.path.join(self.image_dir, 'ori', 'step-%03d_view-%03d_render_ori-%03d_.png' % (i, no_view, code_idx)) )
-                if not no_view % self.cfg.show_edited_img_freq:
-                    Image.fromarray((pred_rgb.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
-                            os.path.join(self.image_dir, 'pred', 'step-%03d_view-%03d_render_pred-%03d_.png' % (i, no_view, code_idx)) )
-
-                end = time.time()
-                log.debug(f"Render finished in {end-start} seconds.") # 0.08
-                # !------------- Calculate SDS and other losses ----------
-
-                start = time.time()
-                # * get sds loss
-                sds_dict = self.ip2p.compute_sds(
-                                text_embedding,
-                                pred_rgb,
-                                rgb_2d,
-                                current_it = i,
-                                guidance_scale=self.cfg.guidance_scale,
-                                image_guidance_scale=self.cfg.image_guidance_scale,
-                                lower_bound=self.cfg.lower_bound,
-                                upper_bound=self.cfg.upper_bound,
-                            )
-                
-                end = time.time()
-                log.debug(f"SDS computation finished in {end-start} seconds.") # 0.6-1
-                start = time.time()
-                loss_ls = []
-                total_loss = sds_dict['loss_sds']
-                loss_ls.append(('sds', sds_dict['loss_sds'].item()))
-
-                # save image
-                if not no_view % self.cfg.show_edited_img_freq:
-                    prev_img = sds_dict['prev_img'] # edited image through the random denoising step
-                    Image.fromarray((prev_img.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
-                            os.path.join(self.image_dir, 'one_step_edit', 'step-%03d_view-%03d_one_step_edit-%03d_.png' % (i, no_view, code_idx)) )
-
-                # generate the edited image of the total diffusion steps (20) for visualization
-                if not self.cfg.most_efficient and self.cfg.show_edited_img and not no_view % self.cfg.show_edited_img_freq:
-                    edited_img = self.ip2p.edit_image( # by default, diffusion steps = 20
-                                text_embedding.to(self.ip2p_device),
-                                pred_rgb.to(self.ip2p_device),
-                                rgb_2d.to(self.ip2p_device),
-                                guidance_scale=self.cfg.guidance_scale,
-                                image_guidance_scale=self.cfg.image_guidance_scale,
-                                lower_bound=self.cfg.lower_bound,
-                                upper_bound=self.cfg.upper_bound,
-                    )
-                    Image.fromarray((edited_img.permute(0, 2, 3, 1).squeeze().cpu().detach().numpy() * 255).astype(np.uint8)).save(
-                            os.path.join(self.image_dir, 'edited', 'step-%03d_view-%03d_edit_img-%03d_.png' % (i, no_view, code_idx)) )
-
-                # * get regu loss
-                if i > 1 and self.cfg.loss_reg_weight > 0.:
-                    loss_reg = self.cfg.loss_reg_weight * (tex_feats**2).mean()
-                    loss_ls.append(('regu', loss_reg.item()))
-                else:
-                    loss_reg = 0.
-                total_loss += loss_reg
-
-                # * get smoothness loss
-                if i > 1 and self.cfg.loss_smooth_weight > 0. and tex_feats_old is not None:
-                    delta_tex_feats = tex_feats - tex_feats_old
-                    smoothness_loss = self.smoothness_loss.cal(delta_tex_feats, self.cfg.loss_smooth_weight)
-                    total_loss += smoothness_loss
-                    loss_ls.append(('smooth', smoothness_loss.item()))
-                else:
-                    smoothness_loss = 0.
-
-                if not self.cfg.most_efficient and self.cfg.visualize_more and not no_view % self.cfg.show_edited_img_freq:
-                    pred_rgb.retain_grad() # for visualization
-
-                end = time.time()
-                log.debug(f"loss caculation finished in {end-start} seconds.") # 0.006
-
-                start = time.time()
-                total_loss = total_loss / 5
-                total_loss.backward()
-
-                # * generate visualization plot
-                if not self.cfg.most_efficient and self.cfg.visualize_more and not no_view % self.cfg.show_edited_img_freq:
-                    grad_sds = pred_rgb.grad.detach().clone()
-                    tex_grad_sds = tex_feats.grad.detach().clone()
-                    vis(i, grad_sds, rgb_2d, pred_rgb, prev_img, edited_img,
-                        tex_grad_sds, smpl_V.cpu(),
-                        save_path=os.path.join(self.image_dir, 'vis', 'step-%03d_view-%03d_vis-%03d_.png' % (i, no_view, code_idx)))
-                
-                # * accumulate vertex gradients in the 1st iteration
-                if self.cfg.grad_aware_cam_sampl and i == 1:
-                    tex_grad_sds = tex_feats.grad.detach().clone()
-                    acc_tex_grad_magn += torch.sqrt(torch.sum(tex_grad_sds**2, dim=-1)).squeeze()
-
-                # * store old texture latents for the smoothness loss in next iteration
-                if self.cfg.loss_smooth_weight > 0.:
-                    tex_feats_old = tex_feats.clone().detach()
-
-                end = time.time()
-                log.debug(f"loss backward finished in {end-start} seconds.") # 0.04
-
-                if no_view % 5 == 0:
-                    start = time.time()
-                    optimizer.step()
-
-                    if not self.cfg.most_efficient and self.cfg.visualize_more and not no_view % self.cfg.show_edited_img_freq:
-                        # Clear the gradients of 'pred_rgb'
-                        if pred_rgb.grad is not None:
-                            pred_rgb.grad = None
-
-                    end = time.time()
-                    optimizer.zero_grad()
-                    log.debug(f"optimizer step finished in {end-start} seconds.") # 0.04
-
-                # * log results
-                self.log(loop, loss_ls, i, step_start + num_steps, region_and_idx, no_view, len(self.sample_indices))
-
-
-            # * save checkpoint
-            if i % self.cfg.save_edit_freq == 0:
-                self.save_edit_checkpoint(i, tex_feats, optimizer, filename=self.cfg.edit_checkpoint_file)
-                with torch.no_grad():
-                    ori_tex_feats= self.rgb_field.get_feature_by_idx(code_idx).clone().unsqueeze(0).detach().data
-                    self.rgb_field.replace_feature_by_idx(code_idx, tex_feats)
-                self.render_2D(code_idx, epoch=i, fix=True, write_to_wandb=True)
-                with torch.no_grad(): # back to original features
-                    self.rgb_field.replace_feature_by_idx(code_idx, ori_tex_feats)
-
-
-        # * replace the original latent codes by the edited one. This can be used later for rendering
-        with torch.no_grad():
-            self.rgb_field.replace_feature_by_idx(code_idx, tex_feats)
     
     
 

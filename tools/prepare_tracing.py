@@ -184,7 +184,7 @@ class TracingPrepare(nn.Module):
                 x, hit = self.tracer(self.sdf_field.forward, _idx,
                                 ray_o_images.view(self.cfg.n_views + fix_n_views_face, -1, 3),
                                 ray_d_images.view(self.cfg.n_views + fix_n_views_face, -1, 3))
-                log.info(f"Rat tracing finished in {time.time()-start} seconds.")
+                log.info(f"Ray tracing finished in {time.time()-start} seconds.")
 
                 dataset_fix_render_xs[s] = x.detach().cpu().numpy()
                 dataset_fix_render_hits[s] = hit.detach().cpu().numpy()
@@ -257,10 +257,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process dataset to H5 file')
     parser = parse_options()
 
+    parser.add_argument('--subject_list', type=str, default='[32]', help='list of subjects to be processed')
+    parser.add_argument('--output-path', type=str, default='prepared_dataset.h5', help='output path to H5 file')
     parser.add_argument('--pretrained-root', type=str, default='checkpoints/demo', help='pretrained model path')
     parser.add_argument('--model-name', type=str, default='model-1000.pth', help='load model name')
-    parser.add_argument('--output-path', type=str, default='./prepared_tracing.h5', help='load model name')
-    parser.add_argument('--subject_list', type=str, default='[1, 4, 8, 5, 15, 17, 22, 32, 34]', help='load model name')
     
 
     args, args_str = argparse_to_str(parser)
