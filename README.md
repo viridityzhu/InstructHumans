@@ -1,5 +1,23 @@
 # InstructHumans: Editing Animated 3D Human Textures with Instructions
 
+![teaser](assets/teaser.jpg)
+
+<p align="center">
+   <h3 align="center">Edit 3D humans with instructions:</h3>
+  <img src="assets/teaser2.jpg" alt="teaser2">
+  
+</p>
+
+<p align="center">
+   <h3 align="center">Then animate them!</h3>
+  <table>
+    <tr>
+      <td><img src="assets/motion1.gif" alt="motion1"></td>
+      <td><img src="assets/motion2.gif" alt="motion2"></td>
+    </tr>
+  </table>
+</p>
+
 ## Installation
 
 Our code has been tested with PyTorch 2.0.1, CUDA 11.7. But other versions should also be fine.
