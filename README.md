@@ -106,9 +106,11 @@ Here are some configuration flags you can use; otherwise you can find full defau
 - We provide `test/test_cp.py` to test a pre-trained checkpoint. Usage:
 
 ```sh
-python test_cp.py --edit_checkpoint_file path/to/checkpoint.pth.tar \
-    --instruction "Make the person into wearing traditional Japanese kimono" \
-    --id 32 --caption_ori "A photo of a person" --caption_tgt "A person wearing traditional Japanese kimono"
+python -m test.test_cp \
+    --edit_checkpoint_file "checkpoints/test/elf32.pth.tar" \
+    --instruction "Turn him into Tolkien Elf" \
+    --id 32 \
+    --caption_ori "A photo of a person" --caption_tgt "A photo of a Tolkien Elf"
 ```
 
 Basically, the supported arguments are the same as `edit.py`.

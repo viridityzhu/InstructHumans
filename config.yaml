@@ -77,11 +77,11 @@ wandb:
 instruct_humans:
   ip2p_device: None
   ip2p_use_full_precision: False
-  show_edited_img: True
+  show_edited_img: False
   show_edited_img_freq: 20
   load_edit_checkpoint: False
   edit_checkpoint_file: 'checkpoint.pth.tar'
-  visualize_more: True
-  most_efficient: False
+  visualize_more: False
+  most_efficient: True
   use_traced_point_dataset: True
   traced_points_data_root: 'prepared_tracing.h5'

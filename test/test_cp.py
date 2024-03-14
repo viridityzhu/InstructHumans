@@ -185,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument('--render-width', type=int, default=512, help='id of the human')
 
     # whether to calculate metrics. if 1, need to provide instruction, caption_ori and caption_tgt.
-    parser.add_argument('--cal-metric', type=int, default=0, help='id of the human')
+    parser.add_argument('--cal-metric', type=int, default=1, help='id of the human')
     parser.add_argument('--render-more', type=int, default=0, help='id of the human')
     parser.add_argument('--instruction', type=str, required=False, help='load model name')
 
@@ -203,7 +203,7 @@ if __name__ == "__main__":
         theId = int(re.findall(r'\d+', args.task_name)[0])
         args.id = theId
         args.load_edit_checkpoint = True
-        args.edit_checkpoint_file = f'checkpoints/{args.task_name}_decom1_weightcam/cp/checkpoint_step{args.cpNum}.pth.tar'
+        args.edit_checkpoint_file = f'checkpoints/{args.task_name}/cp/checkpoint_step{args.cpNum}.pth.tar'
     handlers = [logging.StreamHandler(sys.stdout)]
     logging.basicConfig(level=args.log_level,
                         format='%(asctime)s|%(levelname)8s| %(message)s',
