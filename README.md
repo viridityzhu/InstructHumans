@@ -1,7 +1,35 @@
-# InstructHumans: Editing Animated 3D Human Textures with Instructions
+<div align="center">
+   <h1 align="center">
+    <strong>InstructHumans</strong> <br>
+    Editing Animated 3D Human Textures with Instructions 
+   </h1>
+
+   <p>
+      <a href=https://arxiv.org/abs/xxx target="_blank"><img src=https://img.shields.io/badge/arXiv-b5212f.svg?logo=arxiv height=25px></a>
+      <a href=https://xxx target="_blank"><img src= https://img.shields.io/badge/Project%20Page-bb8a2e.svg?logo=github height=25px></a>
+      <br>
+      <a href="https://wakatime.com/badge/user/7974bf3e-99a6-4d26-8e4b-38ca6d5c9c64/project/f1416cf1-e536-442f-ac24-15d02a21d2c1"><img src="https://wakatime.com/badge/user/7974bf3e-99a6-4d26-8e4b-38ca6d5c9c64/project/f1416cf1-e536-442f-ac24-15d02a21d2c1.svg" alt="wakatime"></a>
+      <img src="https://img.shields.io/github/languages/top/viridityzhu/InstructHumans?style&color=5D6D7E" alt="GitHub top language" />
+      <img src="https://img.shields.io/github/languages/code-size/viridityzhu/InstructHumans?style&color=5D6D7E" alt="GitHub code size in bytes" />
+   </p>
+</div>
+
+<p align="center">
+  <a href="https://jyzhu.top/" target="_blank">Jiayin Zhu</a><sup>1</sup>,&nbsp;
+  <a href="https://www.mu4yang.com/" target="_blank">Linlin Yang</a><sup>2</sup>,&nbsp;
+  <a href="https://www.comp.nus.edu.sg/~ayao/" target="_blank">Angela Yao</a><sup>1,&#x2709</sup>;</a>
+  <br>
+  <a href="https://cvml.comp.nus.edu.sg" target="_blank">Computer Vision & Machine Learning Group</a>, National University of Singapore <sup>1</sup>
+  <br/>
+  Communication University of China <sup>2</sup>
+  <br/>
+  <sup>&#x2709;</sup> Corresponding Author
+</p>
 
 ![teaser](assets/teaser.jpg)
 
+
+## 📑 Abstract
 <p align="center">
    <h3 align="center">Edit 3D humans with instructions:</h3>
   <img src="assets/teaser2.jpg" alt="teaser2">
@@ -18,7 +46,9 @@
   </table>
 </p>
 
-## Installation
+## 📍 InstructHumans Results
+
+## 📦 Installation
 
 Our code has been tested with PyTorch 2.0.1, CUDA 11.7. But other versions should also be fine.
 
@@ -59,22 +89,15 @@ Our code has been tested with PyTorch 2.0.1, CUDA 11.7. But other versions shoul
 
     </details>
 
-## Data preparation
+## 📂 Data preparation
 
-### CustomHumans and SMPL-X
-
-Apply for the CustomHumans dataset in the link: [here](https://forms.gle/oY4PKUyhH6Qqd5YA9). We use pretrained human models from their paper.
-
-- Preparation:
-
-1. Download the checkpoint file from CustomHumans. Make sure the model is put into the `checkpoints` folder in the following structure:
+1. Download the CustomHumans dataset [here](https://forms.gle/oY4PKUyhH6Qqd5YA9). We use their provided pretrained checkpoint. Put it into the `checkpoints` folder in the following structure:
 
 ```sh
 checkpoints/demo/model-1000.pth
 ```
 
-2. Download [SMPL-X](https://smpl-x.is.tue.mpg.de/) models and move them to the `smplx` folder.
-   You should have the following data structure:
+2. Download [SMPL-X](https://smpl-x.is.tue.mpg.de/) models and move them to the `smplx` folder in the following structure:
 
 ```sh
     smplx
@@ -86,13 +109,13 @@ checkpoints/demo/model-1000.pth
     └── SMPLX_FEMALE.npz
 ```
 
-## 3D Human Editing
+## 🎲 3D Human Editing
 
-### Pre-process to speed up the editing
+### Pre-process
 
-For quick start, We provide a prepared data file for human id 32. Please download it [here] into the repository.
+This pre-process helps speed up the editing. We provide a prepared data file for human id 32 for a quick start. Please download it [here](xxx) into the repository.
 
-Otherwise, to prepare the data for other human ids, use:
+Otherwise, to prepare the data for other human IDs, use the following:
 
 ```bash
 python -m tools.prepare_tracing --subject_list [32]
@@ -104,7 +127,7 @@ After this, you can specify the data file by `--traced_points_data_root prepared
 
 ### Edit human with instruction
 
-Simply run the below command, and you will edit the sample human (id 32 in the dataset) into a clown:
+Run the below command, and you will edit the sample human (id 32 in the dataset) into a clown:
 
 ```sh
 python edit.py --instruction "Turn him into a clown" --id 32
@@ -114,14 +137,14 @@ Here are some configuration flags you can use; otherwise you can find full defau
 * `--instruction`: textual editing instruction.
 * `--id`: human subject index. Use this to indicate the original human to be edited. They should be included in the pretrained checkpoints of CustomHumans.
 * `--save-path`: path to the folder to save the checkpoints.
-* `--config`: path to the config file. Default is `config.yaml`
+* `--config`: path to the config file. The default is `config.yaml`
 * `--wandb`: we use wandb for monitoring the training. Activate this flag if you want to use it.
-* `--caption_ori` and `--caption_tgt`: these do not affect the editing at all, but help calculate evaluation metrics. They are captions describing the original or target images.
-* `--sampl_strategy`: to select SDS-E / SDS-E' / SDS to use, set "dt+ds" / "dt+ds2" / "ori", respectively.
+* `--caption_ori` and `--caption_tgt`: these do not affect the editing, but help calculate evaluation metrics. They are captions describing the original or target images.
+* `--sampl_strategy`: to select SDS-E / SDS-E' / SDS to use, set "dt+ds" / "dt+ds2" / "ori", respectively. More details can be found in our paper.
 
-### Test a pre-trained checkpoint
+### Test a trained checkpoint
 
-- We provide `test/test_cp.py` to test a pre-trained checkpoint. Usage:
+- We provide `test/test_cp.py` to test a trained checkpoint. Usage:
 
 ```sh
 python -m test.test_cp \
@@ -133,13 +156,13 @@ python -m test.test_cp \
     --render-more 0
 ```
 
-- `--cal-metric`: whether to calculate the evaluation metrics. If wandb is disabled, the metrics are printed; otherwise they are uploaded to wandb.
-- `--render-more`: by default, for both the original and edited humans, we render 15 images for visualization, and they are saved in the same directory as the checkpoint file. If you want to render more images, you can set this to `1`.
-- Basically, the other supported arguments are the same as `edit.py`.
+- `--cal-metric`: whether to calculate the evaluation metrics. If wandb is disabled, the metrics are printed; otherwise, they are uploaded to wandb.
+- `--render-more`: by default, for both the original and edited humans, we render 15 images for visualization, and they are saved in the same directory as the checkpoint file. You can set this to `1` if you want to render more images.
+- The other supported arguments are the same as `edit.py`.
 
-## Demo for animating an edited human
+## ▶️ Demo for animating an edited human
 
-1. Prepare SMPL-X models with desired pose. For example, you can download MotionX dataset, and use `tools/load_motionx_smplx.py` to convert its SMPL-X json data into `.obj` files.
+1. Prepare SMPL-X models with desired poses. For example, you can download the [MotionX](https://github.com/IDEA-Research/Motion-X) dataset, and use `tools/load_motionx_smplx.py` to convert its SMPL-X JSON data into `.obj` files.
   
     Example usage: `python tools/load_motionx_smplx.py -i test/motion_data/selected_motions`
 2. Reposing and rendering, usage:
@@ -165,3 +188,22 @@ python -m test.test_cp \
     ```
 
     Once done, you'll get generated rendered per frame images as well as an mp4 file in `test/outputs/`.
+
+## 📄 Citation
+
+If you found this repository/our paper useful, please consider citing:
+
+``` bibtex
+@misc{he2024aid,
+      title={InstructHumans: Editing Animated 3D Human Textures with Instructions}, 
+      author={Jiayin Zhu and Linlin Yang and Angela Yao},
+      year={2024},
+      eprint={xxx},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
+## 👏 Acknowledgement
+
+We sincerely thank the authors for their awesome works in [editable-humans](https://github.com/custom-humans/editable-humans) and [instruct-nerf2nerf](https://github.com/ayaanzhaque/instruct-nerf2nerf)!
