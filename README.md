@@ -5,8 +5,9 @@
    </h1>
 
    <p>
+      <a href="./paper.pdf" target="_blank"><img src="https://img.shields.io/badge/Paper-21759b.svg?logo=adobeacrobatreader&logoColor=white" height="25px"></a>
       <a href=https://arxiv.org/abs/xxx target="_blank"><img src=https://img.shields.io/badge/arXiv-b5212f.svg?logo=arxiv height=25px></a>
-      <a href=https://xxx target="_blank"><img src= https://img.shields.io/badge/Project%20Page-bb8a2e.svg?logo=github height=25px></a>
+      <a href="https://jyzhu.top/instruct-humans/" target="_blank"><img src= https://img.shields.io/badge/Project%20Page-bb8a2e.svg?logo=github height=25px></a>
       <br>
       <a href="https://wakatime.com/badge/user/7974bf3e-99a6-4d26-8e4b-38ca6d5c9c64/project/f1416cf1-e536-442f-ac24-15d02a21d2c1"><img src="https://wakatime.com/badge/user/7974bf3e-99a6-4d26-8e4b-38ca6d5c9c64/project/f1416cf1-e536-442f-ac24-15d02a21d2c1.svg" alt="wakatime"></a>
       <img src="https://img.shields.io/github/languages/top/viridityzhu/InstructHumans?style&color=5D6D7E" alt="GitHub top language" />
@@ -31,22 +32,30 @@
 
 ## 📑 Abstract
 <p align="center">
-   <h3 align="center">Edit 3D humans with instructions:</h3>
-  <img src="assets/teaser2.jpg" alt="teaser2">
-  
+   InstructHumans edits 3D human textures with instructions. 
+   It maintains avatar consistency and enables easy animation.
+  <img src="assets/aim.gif" alt="teaser2">
 </p>
 
-<p align="center">
-   <h3 align="center">Then animate them!</h3>
-  <table>
-    <tr>
-      <td><img src="assets/motion1.gif" alt="motion1"></td>
-      <td><img src="assets/motion2.gif" alt="motion2"></td>
-    </tr>
-  </table>
-</p>
 
 ## 📍 InstructHumans Results
+   <h3 align="center">
+    Editing gallery
+   </h3>
+
+*Left to right: Original, "Turn the person into a clown",
+"Turn the person into Lord Voldemort",
+"Put the person in a suit",
+"A bronze statue".*
+
+<img src="assets/grid_output.gif" alt="teaser2">
+InstructHumans produce high-fidelity editing results, that align with editing instructions, while faithfully preserving the details of original avatars.
+   <h3 align="center">
+    Animation
+   </h3>
+<img src="assets/1x4_grid_output.gif" alt="teaser2">
+Edited avatars can be easily animated!
+
 
 ## 📦 Installation
 
@@ -177,16 +186,6 @@ python -m test.test_cp \
         --n_views 4 # rendered views per frame \
     ```
 
-    ```sh
-    python -m test.drive_motion \
-        --id 33 \
-        --load_edit_checkpoint True \
-        --edit_checkpoint_file checkpoints/suit33_decom1_sm10/cp/suit33_1000.pth.tar \
-        --motion-folder test/motion_data/selected_motions/Bai_Jingting_Said_It_Looks_Good_And_Then_I_Posted_It_Clip1 \
-        --output-name suit33_motion1 \
-        --n_views 1 \
-    ```
-
     Once done, you'll get generated rendered per frame images as well as an mp4 file in `test/outputs/`.
 
 ## 📄 Citation
@@ -194,16 +193,19 @@ python -m test.test_cp \
 If you found this repository/our paper useful, please consider citing:
 
 ``` bibtex
-@misc{he2024aid,
-      title={InstructHumans: Editing Animated 3D Human Textures with Instructions}, 
-      author={Jiayin Zhu and Linlin Yang and Angela Yao},
-      year={2024},
-      eprint={xxx},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
+@article{zhu2024InstructHumans,
+         author={Zhu, Jiayin and Yang, Linlin and Yao, Angela},
+         title={InstructHumans: Editing Animated 3D Human Textures with Instructions},
+         journal={arXiv preprint arXiv:xxxx.xxxx},
+         year={2024}
+} 
 ```
 
 ## 👏 Acknowledgement
 
 We sincerely thank the authors for their awesome works in [editable-humans](https://github.com/custom-humans/editable-humans) and [instruct-nerf2nerf](https://github.com/ayaanzhaque/instruct-nerf2nerf)!
+
+## TODO
+
+- [ ] Update Arxiv links
+- [ ] Upload checkpoints
