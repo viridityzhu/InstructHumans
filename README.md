@@ -196,7 +196,7 @@ If you found this repository/our paper useful, please consider citing:
 @article{zhu2024InstructHumans,
          author={Zhu, Jiayin and Yang, Linlin and Yao, Angela},
          title={InstructHumans: Editing Animated 3D Human Textures with Instructions},
-         journal={arXiv preprint arXiv:xxxx.xxxx},
+         journal={arXiv preprint arXiv:2404.04037},
          year={2024}
 } 
 ```
