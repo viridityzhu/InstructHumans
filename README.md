@@ -6,7 +6,7 @@
 
    <p>
       <a href="https://jyzhu.top/instruct-humans/data/InstructHumans.pdf" target="_blank"><img src="https://img.shields.io/badge/Paper-21759b.svg?logo=adobeacrobatreader&logoColor=white" height="25px"></a>
-<!--       <a href=https://arxiv.org/abs/xxx target="_blank"><img src=https://img.shields.io/badge/arXiv-b5212f.svg?logo=arxiv height=25px></a> -->
+      <a href=https://arxiv.org/abs/2404.04037 target="_blank"><img src=https://img.shields.io/badge/arXiv-b5212f.svg?logo=arxiv height=25px></a>
       <a href="https://jyzhu.top/instruct-humans/" target="_blank"><img src= https://img.shields.io/badge/Project%20Page-bb8a2e.svg?logo=github height=25px></a>
       <br>
       <a href="https://wakatime.com/badge/user/7974bf3e-99a6-4d26-8e4b-38ca6d5c9c64/project/f1416cf1-e536-442f-ac24-15d02a21d2c1"><img src="https://wakatime.com/badge/user/7974bf3e-99a6-4d26-8e4b-38ca6d5c9c64/project/f1416cf1-e536-442f-ac24-15d02a21d2c1.svg" alt="wakatime"></a>
@@ -207,5 +207,4 @@ We sincerely thank the authors for their awesome works in [editable-humans](http
 
 ## TODO
 
-- [ ] Update Arxiv links
 - [ ] Upload checkpoints
