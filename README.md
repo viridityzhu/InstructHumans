@@ -120,21 +120,26 @@ checkpoints/demo/model-1000.pth
 
 ## 🎲 3D Human Editing
 
+### Checkpoints
+
+In [google drive link](https://drive.google.com/file/d/1OjrEhHrExD0egPQdkn3S8ll4PltFkfzS/view?usp=sharing), we provide our pre-trained checkpoints, pre-processed data, and an example animation motion.
+
 ### Pre-process
 
-This pre-process helps speed up the editing. We provide a prepared data file for human id 32 for a quick start. Please download it [here](xxx) into the repository.
+This pre-process helps speed up the editing. In the previous link, we provide a prepared data file for human id 32 for a quick start.
 
-Otherwise, to prepare the data for other human IDs, use the following:
+The data file can be specified by `--traced_points_data_root prepared_tracing.h5` when editing.
+
+To prepare the data for other human IDs, use the following:
 
 ```bash
-python -m tools.prepare_tracing --subject_list [32]
+python -m tools.prepare_tracing --subject_list [9,15]
 ```
 
-`--subject_list [9,32]` specifies subject ids to be processed. Processing one subject takes around 30 minutes. (This will pre-sample intermediate results of ray tracing for each human subject and cache them in a h5 file. This way, we can avoid repeating ray tracing and extremely speed up the editing procedure.)
+`--subject_list []` specifies subject ids to be processed. Processing one subject takes around 30 minutes. (This will pre-sample intermediate results of ray tracing for each human subject and cache them in a h5 file. This way, we can avoid repeating ray tracing and extremely speed up the editing procedure.)
 
-After this, you can specify the data file by `--traced_points_data_root prepared_tracing.h5` when editing.
 
-### Edit human with instruction
+### Edit human with instructions
 
 Run the below command, and you will edit the sample human (id 32 in the dataset) into a clown:
 
@@ -171,22 +176,27 @@ python -m test.test_cp \
 
 ## ▶️ Demo for animating an edited human
 
-1. Prepare SMPL-X models with desired poses. For example, you can download the [MotionX](https://github.com/IDEA-Research/Motion-X) dataset, and use `tools/load_motionx_smplx.py` to convert its SMPL-X JSON data into `.obj` files.
+1. Prepare SMPL-X models with desired poses. For example, you can download the [MotionX](https://github.com/IDEA-Research/Motion-X) dataset, and use `tools/load_motionx_smplx.py` to convert its SMPL-X JSON data into `.obj` files. We've provided an example motion clip in the checkpoints link.
   
-    Example usage: `python tools/load_motionx_smplx.py -i test/motion_data/selected_motions`
+    Example usage:
+
+    ```sh
+    python tools/load_motionx_smplx.py -i test/motionX_example
+    ```
+
 2. Reposing and rendering, usage:
 
     ```sh
     python -m test.drive_motion \
         --id 9 # subject id (only affect the geometry) \
         --load_edit_checkpoint True \
-        --edit_checkpoint_file checkpoints/joker9/cp/checkpoint_step1000.pth.tar  # texture checkpoint \
-        --motion-folder game_motion/subset_0001/Dance_Back # many obj files defining the motion, prepared in step 1 \
+        --edit_checkpoint_file checkpoints/joker9/checkpoint_step1000.pth.tar  # texture checkpoint \
+        --motion-folder test/motionX_example/Electrician_dancing # many obj files defining the motion, prepared in step 1 \
         --output-name joker9 # output folder's name \
         --n_views 4 # rendered views per frame \
     ```
 
-    Once done, you'll get generated rendered per frame images as well as an mp4 file in `test/outputs/`.
+    Once done, you'll get generated rendered per frame images as well as an mp4 video in `test/outputs/`.
 
 ## 📄 Citation
 
@@ -204,7 +214,3 @@ If you found this repository/our paper useful, please consider citing:
 ## 👏 Acknowledgement
 
 We sincerely thank the authors for their awesome works in [editable-humans](https://github.com/custom-humans/editable-humans) and [instruct-nerf2nerf](https://github.com/ayaanzhaque/instruct-nerf2nerf)!
-
-## TODO
-
-- [ ] Upload checkpoints
