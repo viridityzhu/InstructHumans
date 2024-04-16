@@ -237,8 +237,8 @@ def parse_options():
                             help='Weight decay.')
     instruct_humans_group.add_argument('--lr_nerf', type=float, default=0.0025, 
                             help='Learning rate for rgb nerf')
-    instruct_humans_group.add_argument('--sampl_strategy', type=str, default='dt+ds3',
-                            help='dynamic t sampling, sds, or not. Should be either dt+ds3, dt+ds2, dt+ds, dt, ds, or ori.')
+    instruct_humans_group.add_argument('--sampl_strategy', type=str, default='dt+ds',
+                            help='dynamic t sampling, sds, or not. Should be either dt+ds (SDS-E), dt+ds3 (SDS-E\'), dt+ds2 (SDS-E\'\'), dt (SDS + non-increasing timestep), ds (SDS-E + random timestep), or ori (SDS + random timestep).')
     instruct_humans_group.add_argument('--mode_change_step', type=int, default=800, 
                             help='Select the mode-disengaging term when t > this, and mode-seeking term otherwise')
     instruct_humans_group.add_argument('--mode_change_step2', type=int, default=150, 
@@ -253,7 +253,7 @@ def parse_options():
                             help='caption text to describe the target human.')
     instruct_humans_group.add_argument('--traced_points_data_root', type=str, default='prepared_tracing.h5',
                             help='the prepared traced points data file.')
-    instruct_humans_group.add_argument('--use_traced_point_dataset', type=bool, default=False, 
+    instruct_humans_group.add_argument('--use_traced_point_dataset', type=bool, default=True, 
                             help='use the prepared traced points to speed up.')
     instruct_humans_group.add_argument('--grad_aware_cam_sampl', type=bool, default=True, 
                             help='gradient aware camera sampling')
