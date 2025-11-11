@@ -18,14 +18,14 @@
 <p align="center">
   <a href="https://jyzhu.top/" target="_blank">Jiayin Zhu</a><sup>1</sup>,&nbsp;
   <a href="https://www.mu4yang.com/" target="_blank">Linlin Yang</a><sup>2</sup>,&nbsp;
-  <a href="https://www.comp.nus.edu.sg/~ayao/" target="_blank">Angela Yao</a><sup>1,&#x2709</sup>;</a>
+  <a href="https://www.comp.nus.edu.sg/~ayao/" target="_blank">Angela Yao</a><sup>1</sup>;</a>
   <br>
   <a href="https://cvml.comp.nus.edu.sg" target="_blank">Computer Vision & Machine Learning Group</a>, National University of Singapore <sup>1</sup>
   <br/>
   Communication University of China <sup>2</sup>
-  <br/>
-  <sup>&#x2709;</sup> Corresponding Author
 </p>
+
+<h3 align="center">IEEE Transactions on Multimedia (TMM)</h3>
 
 ![teaser](assets/teaser.jpg)
 
@@ -204,10 +204,10 @@ If you found this repository/our paper useful, please consider citing:
 
 ``` bibtex
 @article{zhu2024InstructHumans,
-         author={Zhu, Jiayin and Yang, Linlin and Yao, Angela},
-         title={InstructHumans: Editing Animated 3D Human Textures with Instructions},
-         journal={arXiv preprint arXiv:2404.04037},
-         year={2024}
+    author = {Zhu, Jiayin and Yang, Linlin and Yao, Angela},
+    year = {2025},
+    title = {InstructHumans: Editing Animated 3D Human Textures with Instructions},
+    journal = {IEEE Transactions on Multimedia (TMM)}
 } 
 ```
 
