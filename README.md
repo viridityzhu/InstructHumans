@@ -5,7 +5,7 @@
    </h1>
 
    <p>
-      <a href="https://jyzhu.top/instruct-humans/data/InstructHumans.pdf" target="_blank"><img src="https://img.shields.io/badge/Paper-21759b.svg?logo=adobeacrobatreader&logoColor=white" height="25px"></a>
+      <a href="https://ieeexplore.ieee.org/document/11417296" target="_blank"><img src="https://img.shields.io/badge/Paper-21759b.svg?logo=adobeacrobatreader&logoColor=white" height="25px"></a>
       <a href=https://arxiv.org/abs/2404.04037 target="_blank"><img src=https://img.shields.io/badge/arXiv-b5212f.svg?logo=arxiv height=25px></a>
       <a href="https://jyzhu.top/instruct-humans/" target="_blank"><img src= https://img.shields.io/badge/Project%20Page-bb8a2e.svg?logo=github height=25px></a>
       <br>
@@ -203,9 +203,9 @@ python -m test.test_cp \
 If you found this repository/our paper useful, please consider citing:
 
 ``` bibtex
-@article{zhu2024InstructHumans,
+@article{zhu2026InstructHumans,
     author = {Zhu, Jiayin and Yang, Linlin and Yao, Angela},
-    year = {2025},
+    year = {2026},
     title = {InstructHumans: Editing Animated 3D Human Textures with Instructions},
     journal = {IEEE Transactions on Multimedia (TMM)}
 } 
